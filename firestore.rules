@@ -1,0 +1,33 @@
+// Firestore Security Rules
+// Firebase Console > Firestore > Rules bölümüne yapıştır
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: sadece kendi kaydını okuyup yazabilir
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Drivers: kendi kaydını yazar, herkes okuyabilir (eşleşme için)
+    match /drivers/{driverId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == driverId;
+    }
+
+    // Requests: kullanıcı oluşturur, sürücüler okur ve kabul eder
+    match /requests/{requestId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        // İsteği oluşturan kullanıcı iptal edebilir
+        request.auth.uid == resource.data.userId ||
+        // Herhangi bir sürücü searching → accepted yapabilir (transaction ile)
+        (resource.data.status == 'searching' && request.resource.data.status == 'accepted') ||
+        // İşi kabul eden sürücü durumu güncelleyebilir
+        request.auth.uid == resource.data.driverId
+      );
+    }
+  }
+}
